@@ -1,0 +1,50 @@
+{
+  "title": "Какая форма нужна",
+  "back": {
+    "href": "https://example.com/it-support/",
+    "label": "Каталог IT Support"
+  },
+  "forms": {
+    "account": {
+      "label": "Проблема с учётной записью",
+      "href": "https://example.com/forms/account",
+      "hint": "Для входа и сброса пароля в поле «Сервис» выбирайте Active Directory или почту, а не «Нет в списке»."
+    },
+    "corp": {
+      "label": "Проблема с корпоративными сервисами",
+      "href": "https://example.com/forms/corp"
+    },
+    "diag": {
+      "label": "Диагностика и настройка ИТ-оборудования",
+      "href": "https://example.com/forms/diag"
+    },
+    "software": {
+      "label": "Установка ПО на устройства",
+      "href": "https://example.com/forms/software"
+    },
+    "internet": {
+      "label": "Проблема с интернетом",
+      "href": "https://example.com/forms/internet"
+    },
+    "phone": {
+      "label": "Проблема с телефонией",
+      "href": "https://example.com/forms/phone"
+    },
+    "meet": {
+      "label": "ИТ-оборудование в переговорных",
+      "href": "https://example.com/forms/meet"
+    },
+    "vks": {
+      "label": "Организация видеоконференции",
+      "href": "https://example.com/forms/vks"
+    },
+    "move": {
+      "label": "Подключение или перемещение ИТ-оборудования",
+      "href": "https://example.com/forms/move"
+    },
+    "other": {
+      "label": "Другая проблема",
+      "href": "https://example.com/forms/other"
+    }
+  }
+}

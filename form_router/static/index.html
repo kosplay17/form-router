@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IT Support — выбор формы</title>
+  <style>
+    :root {
+      --bg: #f6f5f2;
+      --ink: #1c1917;
+      --muted: #57534e;
+      --line: #e7e5e4;
+      --card: #fff;
+      --accent: #4b71d6;
+      --accent-hover: #3d5fbd;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 64px; }
+    h1 { font-size: 24px; font-weight: 700; margin: 0 0 8px; }
+    .lead { color: var(--muted); margin: 0 0 24px; }
+    label { display: block; font-weight: 600; margin-bottom: 8px; }
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font: inherit;
+      resize: vertical;
+      background: var(--card);
+    }
+    textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    button, .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 16px;
+      border: 0;
+      border-radius: 8px;
+      font: inherit;
+      font-weight: 650;
+      cursor: pointer;
+      text-decoration: none;
+      color: #fff;
+      background: var(--accent);
+    }
+    button:hover, .btn:hover { background: var(--accent-hover); }
+    button.ghost, .btn.ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+    .chips { margin: 16px 0 0; }
+    .chips p { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+    .chip {
+      display: inline-block;
+      margin: 0 6px 6px 0;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 400;
+    }
+    .chip:hover { border-color: var(--accent); background: var(--card); }
+    #result {
+      display: none;
+      margin-top: 24px;
+      padding: 16px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    #result.show { display: block; }
+    #result h2 { font-size: 18px; margin: 0 0 8px; }
+    .why { color: var(--muted); font-size: 14px; margin: 0 0 16px; }
+    .match { font-size: 12px; color: var(--muted); margin: 12px 0 0; }
+    .error { color: #b91c1c; }
+    a.back { color: var(--accent); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <p id="back" hidden><a class="back" href="#"></a></p>
+    <h1 id="title">Какая форма нужна</h1>
+    <p class="lead">
+      Кратко опишите проблему — подходящая форма появится сама,
+      без отправки тикета с этой страницы.
+    </p>
+
+    <label for="q">Что случилось?</label>
+    <textarea id="q" maxlength="400" placeholder="Например: не могу сбросить пароль, не подключается VPN, не работает почта"></textarea>
+    <div class="row">
+      <button type="button" class="ghost" id="clear">Очистить</button>
+    </div>
+
+    <div class="chips">
+      <p>Или выберите сразу:</p>
+      <button type="button" class="chip" data-preset="пароль, не могу войти в учетку">Пароль / вход</button>
+      <button type="button" class="chip" data-preset="не подключается vpn">VPN</button>
+      <button type="button" class="chip" data-preset="не работает почта">Почта / Wiki / трекер / 1С</button>
+      <button type="button" class="chip" data-preset="не работает принтер">Принтер / железо</button>
+      <button type="button" class="chip" data-preset="нужно установить программу">Установить ПО</button>
+      <button type="button" class="chip" data-preset="нет интернета wifi">Интернет</button>
+      <button type="button" class="chip" data-preset="другое">Другое</button>
+    </div>
+
+    <div id="result" aria-live="polite"></div>
+  </div>
+
+  <script>
+    (function () {
+      var params = new URLSearchParams(location.search);
+      var API = (params.get("api") || "").replace(/\/$/, "") + "/form-router";
+      var USE_LLM = params.get("llm") !== "0";
+      var WAIT_MS = 350;
+      var MIN_CHARS = 3;
+
+      var q = document.getElementById("q");
+      var result = document.getElementById("result");
+      var catalog = null;
+      var timer = null;
+      var seq = 0;
+
+      function el(tag, attrs, text) {
+        var node = document.createElement(tag);
+        Object.keys(attrs || {}).forEach(function (k) { node.setAttribute(k, attrs[k]); });
+        if (text) node.textContent = text;
+        return node;
+      }
+
+      function clearResult() {
+        result.className = "";
+        result.replaceChildren();
+      }
+
+      function showMessage(text, isError) {
+        result.className = "show";
+        result.replaceChildren(el("p", { "class": isError ? "why error" : "why" }, text));
+      }
+
+      function showHit(hit) {
+        var forms = catalog.forms;
+        var form = forms[hit.form] || forms.other;
+        var row = el("div", { "class": "row" });
+        row.append(el("a", { "class": "btn", href: form.href, rel: "noopener" }, "Открыть форму"));
+        if (hit.form !== "other") {
+          row.append(el("a", { "class": "btn ghost", href: forms.other.href, rel: "noopener" },
+            "Это не то, открыть «" + forms.other.label + "»"));
+        }
+        var nodes = [
+          el("h2", null, "Вам нужна форма: " + form.label),
+          el("p", { "class": "why" }, "Почему: " + (hit.why || "правила каталога") + ".")
+        ];
+        if (form.hint) nodes.push(el("p", { "class": "why" }, form.hint));
+        nodes.push(row, el("p", { "class": "match" },
+          (hit.source === "llm" ? "Правила каталога + нейросеть." : "Правила каталога.") +
+          " Тикет с этой страницы не создаётся."));
+        result.className = "show";
+        result.replaceChildren.apply(result, nodes);
+      }
+
+      function classify(text) {
+        var my = ++seq;
+        return fetch(API + "/classify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: text, use_llm: USE_LLM })
+        }).then(function (res) {
+          if (res.status === 429) throw new Error("Слишком много запросов, попробуйте через минуту.");
+          if (!res.ok) throw new Error("Сервис недоступен (" + res.status + ").");
+          return res.json();
+        }).then(function (hit) {
+          if (my === seq) showHit(hit);
+        }).catch(function (err) {
+          if (my === seq) showMessage(err.message, true);
+        });
+      }
+
+      function schedule(text, now) {
+        if (timer) clearTimeout(timer);
+        seq += 1;
+        var raw = (text || "").trim();
+        if (!catalog || raw.length < MIN_CHARS) {
+          clearResult();
+          return;
+        }
+        if (!result.classList.contains("show")) showMessage("Подбираю форму…");
+        timer = setTimeout(function () { classify(raw); }, now ? 0 : WAIT_MS);
+      }
+
+      function applyCatalog(data) {
+        catalog = data;
+        document.getElementById("title").textContent = data.title;
+        if (data.back) {
+          var back = document.getElementById("back");
+          back.firstElementChild.href = data.back.href;
+          back.firstElementChild.textContent = "← " + data.back.label;
+          back.hidden = false;
+        }
+      }
+
+      document.getElementById("clear").addEventListener("click", function () {
+        if (timer) clearTimeout(timer);
+        seq += 1;
+        q.value = "";
+        clearResult();
+        q.focus();
+      });
+      q.addEventListener("input", function () { schedule(q.value); });
+      document.querySelectorAll(".chip").forEach(function (chip) {
+        chip.addEventListener("click", function () {
+          q.value = chip.getAttribute("data-preset");
+          schedule(q.value, true);
+        });
+      });
+
+      fetch(API + "/forms")
+        .then(function (res) {
+          if (!res.ok) throw new Error(res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          applyCatalog(data);
+          if (params.get("q")) q.value = params.get("q");
+          if (q.value) schedule(q.value, true);
+        })
+        .catch(function () {
+          showMessage("Не удалось загрузить каталог форм. Проверьте, что сервис запущен.", true);
+        });
+    })();
+  </script>
+</body>
+</html>

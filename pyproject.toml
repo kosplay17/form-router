@@ -1,0 +1,10 @@
+[project]
+name = "form-router"
+version = "1.0.0"
+description = "Pick the right IT Support request form from a free-text problem description"
+requires-python = ">=3.11"
+license = "MIT"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
